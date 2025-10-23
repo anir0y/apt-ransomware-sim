@@ -152,7 +152,9 @@ This project is intended for educational purposes only. It simulates a ransomwar
 
 ---
 
-[![Youtube Video]()](https://youtu.be/R0nV2_K4ncE)
+
+
+[![Youtube Video](https://i.ibb.co/cS8MvfdQ/2.png)](https://youtu.be/R0nV2_K4ncE)
 
 ---
 
